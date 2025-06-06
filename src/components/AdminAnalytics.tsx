@@ -152,7 +152,7 @@ export const AdminAnalytics: React.FC = () => {
           <div className="text-center text-gray-500">
             <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>Chart visualization would be implemented here</p>
-            <p className="text-sm">Integration with charting library like Chart.js or Recharts</p>
+            <p className="text-sm">Integration with a charting library (e.g., Chart.js or Recharts) would be implemented here</p>
           </div>
         </div>
       </motion.div>
