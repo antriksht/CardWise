@@ -158,10 +158,10 @@ export const LoginPage: React.FC = () => {
                 <Mail className="h-8 w-8 text-success-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold mb-2">Password Sent!</h3>
+                <h3 className="text-lg font-semibold mb-2">Check Your Email!</h3>
                 <p className="text-gray-600 text-sm">
-                  We've sent a password to <strong>{userEmail}</strong>. 
-                  Please check your email and use that password to login.
+                  We've sent a password reset link to <strong>{userEmail}</strong>.
+                  Follow the instructions in the email to set your password.
                 </p>
               </div>
               <button
