@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../supabaseClient';
+const REDIRECT_URL = `${window.location.origin}/reset-password`;
 
 export interface User {
   id: string;
@@ -100,6 +101,14 @@ const mockUsers: User[] = [
       totalEmi: 0,
       hasCreditCards: 'no'
     }
+  },
+  {
+    id: '4',
+    email: 'antriksh.tewari89@gmail.com',
+    name: 'Antriksh Tewari',
+    isAdmin: false,
+    createdAt: '2024-01-20T00:00:00Z',
+    isActive: true
   }
 ];
 
@@ -148,14 +157,18 @@ export const useAuthStore = create<AuthState>()(
       sendPasswordToEmail: async (email: string, isNewUser: boolean) => {
         if (isNewUser) {
           const password = generatePassword();
-          const { data, error } = await supabase.auth.signUp({ email, password });
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: REDIRECT_URL }
+          });
           if (error || !data.user) return false;
           await supabase.from('users').insert({ id: data.user.id, email: data.user.email });
-          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email);
+          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: REDIRECT_URL });
           return !resetErr;
         }
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: REDIRECT_URL });
         return !error;
       },
 
@@ -186,7 +199,10 @@ export const useAuthStore = create<AuthState>()(
         const { data, error } = await supabase.auth.signUp({
           email: userData.email?.toLowerCase() || '',
           password,
-          options: { data: { name: userData.name, phone: userData.phone } }
+          options: {
+            emailRedirectTo: REDIRECT_URL,
+            data: { name: userData.name, phone: userData.phone }
+          }
         });
 
         if (error || !data.user) return false;
@@ -271,7 +287,7 @@ export const useAuthStore = create<AuthState>()(
           throw new Error('User not found');
         }
 
-        const { error } = await supabase.auth.resetPasswordForEmail(data.email);
+        const { error } = await supabase.auth.resetPasswordForEmail(data.email, { redirectTo: REDIRECT_URL });
         if (error) throw error;
         return 'reset-link-sent';
       }
