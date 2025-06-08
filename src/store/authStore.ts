@@ -100,6 +100,14 @@ const mockUsers: User[] = [
       totalEmi: 0,
       hasCreditCards: 'no'
     }
+  },
+  {
+    id: '4',
+    email: 'antriksh.tewari89@gmail.com',
+    name: 'Antriksh Tewari',
+    isAdmin: false,
+    createdAt: '2024-01-20T00:00:00Z',
+    isActive: true
   }
 ];
 

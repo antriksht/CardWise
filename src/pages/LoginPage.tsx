@@ -62,8 +62,12 @@ export const LoginPage: React.FC = () => {
         reset({ email: data.email });
       } else {
         // New user - send password to email
-        await sendPasswordToEmail(data.email, true);
-        setStep('password-sent');
+        const sent = await sendPasswordToEmail(data.email, true);
+        if (sent) {
+          setStep('password-sent');
+        } else {
+          setError('root', { message: 'Failed to send password email. Please try again.' });
+        }
       }
     } catch (error) {
       setError('root', { message: 'An error occurred. Please try again.' });
@@ -105,8 +109,12 @@ export const LoginPage: React.FC = () => {
   const handleForgotPassword = async () => {
     setLoading(true);
     try {
-      await sendPasswordToEmail(userEmail, false);
-      setStep('password-sent');
+      const sent = await sendPasswordToEmail(userEmail, false);
+      if (sent) {
+        setStep('password-sent');
+      } else {
+        setError('root', { message: 'Failed to send password reset email.' });
+      }
     } catch (error) {
       setError('root', { message: 'Failed to send password reset email.' });
     } finally {
