@@ -7,6 +7,7 @@ import { ComparePage } from './pages/ComparePage';
 import { CardDetailsPage } from './pages/CardDetailsPage';
 import { AdminPage } from './pages/AdminPage';
 import { LoginPage } from './pages/LoginPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -19,8 +20,9 @@ function App() {
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/card/:id" element={<CardDetailsPage />} />
-          <Route 
-            path="/admin" 
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/admin"
             element={
               <ProtectedRoute adminOnly>
                 <AdminPage />
