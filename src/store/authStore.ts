@@ -131,109 +131,218 @@ export const useAuthStore = create<AuthState>()(
       users: mockUsers,
 
       checkUserExists: async (email: string) => {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email.toLowerCase())
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email.toLowerCase())
+            .maybeSingle();
 
-        if (data) {
-          return {
-            exists: true,
-            user: {
-              id: data.id,
-              email: data.email,
-              name: '',
-              isAdmin: false,
-              createdAt: data.created_at,
-              isActive: true
-            }
-          };
+          if (error) {
+            console.error('Error checking user existence:', error);
+            return { exists: false };
+          }
+
+          if (data) {
+            return {
+              exists: true,
+              user: {
+                id: data.id,
+                email: data.email,
+                name: data.name || '',
+                isAdmin: false,
+                createdAt: data.created_at,
+                isActive: true
+              }
+            };
+          }
+
+          return { exists: false };
+        } catch (error) {
+          console.error('Unexpected error checking user existence:', error);
+          return { exists: false };
         }
-
-        return { exists: false };
       },
 
       sendPasswordToEmail: async (email: string, isNewUser: boolean) => {
-        if (isNewUser) {
-          const password = generatePassword();
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: { emailRedirectTo: REDIRECT_URL }
-          });
-          if (error || !data.user) return false;
-          await supabase.from('users').insert({ id: data.user.id, email: data.user.email });
-          const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: REDIRECT_URL });
-          return !resetErr;
-        }
+        try {
+          if (isNewUser) {
+            const password = generatePassword();
+            const { data, error } = await supabase.auth.signUp({
+              email,
+              password,
+              options: { emailRedirectTo: REDIRECT_URL }
+            });
+            
+            if (error) {
+              console.error('Error during sign up:', error);
+              return false;
+            }
+            
+            if (!data.user) {
+              console.error('No user data returned from sign up');
+              return false;
+            }
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: REDIRECT_URL });
-        return !error;
+            // Try to insert user data, but don't fail if it errors
+            try {
+              await supabase.from('users').insert({ 
+                id: data.user.id, 
+                email: data.user.email,
+                name: data.user.user_metadata?.name || ''
+              });
+            } catch (insertError) {
+              console.warn('Could not insert user data:', insertError);
+            }
+
+            const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, { 
+              redirectTo: REDIRECT_URL 
+            });
+            
+            if (resetErr) {
+              console.error('Error sending password reset:', resetErr);
+              return false;
+            }
+            
+            return true;
+          }
+
+          const { error } = await supabase.auth.resetPasswordForEmail(email, { 
+            redirectTo: REDIRECT_URL 
+          });
+          
+          if (error) {
+            console.error('Error sending password reset:', error);
+            return false;
+          }
+          
+          return true;
+        } catch (error) {
+          console.error('Unexpected error in sendPasswordToEmail:', error);
+          return false;
+        }
       },
 
       login: async (email: string, password: string) => {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error || !data.session) return false;
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          
+          if (error) {
+            console.error('Login error:', error);
+            return false;
+          }
+          
+          if (!data.session) {
+            console.error('No session returned from login');
+            return false;
+          }
 
-        const u = data.session.user;
-        set({
-          user: {
-            id: u.id,
-            email: u.email || '',
-            name: u.user_metadata?.name,
-            phone: u.user_metadata?.phone,
-            isAdmin: false,
-            createdAt: u.created_at,
-            isActive: true,
-            lastLogin: new Date().toISOString()
-          },
-          isAuthenticated: true
-        });
+          const u = data.session.user;
+          set({
+            user: {
+              id: u.id,
+              email: u.email || '',
+              name: u.user_metadata?.name || '',
+              phone: u.user_metadata?.phone,
+              isAdmin: false,
+              createdAt: u.created_at,
+              isActive: true,
+              lastLogin: new Date().toISOString()
+            },
+            isAuthenticated: true
+          });
 
-        await supabase.from('users').upsert({ id: u.id, email: u.email });
-        return true;
+          // Try to upsert user data, but don't fail if it errors
+          try {
+            await supabase.from('users').upsert({ 
+              id: u.id, 
+              email: u.email,
+              name: u.user_metadata?.name || ''
+            });
+          } catch (upsertError) {
+            console.warn('Could not upsert user data:', upsertError);
+          }
+
+          return true;
+        } catch (error) {
+          console.error('Unexpected error during login:', error);
+          return false;
+        }
       },
 
       register: async (userData: Partial<User>, password: string) => {
-        const { data, error } = await supabase.auth.signUp({
-          email: userData.email?.toLowerCase() || '',
-          password,
-          options: {
-            emailRedirectTo: REDIRECT_URL,
-            data: { name: userData.name, phone: userData.phone }
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email: userData.email?.toLowerCase() || '',
+            password,
+            options: {
+              emailRedirectTo: REDIRECT_URL,
+              data: { name: userData.name, phone: userData.phone }
+            }
+          });
+
+          if (error) {
+            console.error('Registration error:', error);
+            return false;
           }
-        });
+          
+          if (!data.user) {
+            console.error('No user data returned from registration');
+            return false;
+          }
 
-        if (error || !data.user) return false;
+          const newUser: User = {
+            id: data.user.id,
+            name: userData.name || '',
+            email: data.user.email || '',
+            phone: userData.phone,
+            profile: userData.profile,
+            isAdmin: false,
+            createdAt: data.user.created_at,
+            isActive: true
+          };
 
-        const newUser: User = {
-          id: data.user.id,
-          name: userData.name || '',
-          email: data.user.email || '',
-          phone: userData.phone,
-          profile: userData.profile,
-          isAdmin: false,
-          createdAt: data.user.created_at,
-          isActive: true
-        };
+          set({ user: newUser, isAuthenticated: true });
 
-        set({ user: newUser, isAuthenticated: true });
-        await supabase.from('users').insert({ id: data.user.id, email: data.user.email });
-        return true;
+          // Try to insert user data, but don't fail if it errors
+          try {
+            await supabase.from('users').insert({ 
+              id: data.user.id, 
+              email: data.user.email,
+              name: userData.name || ''
+            });
+          } catch (insertError) {
+            console.warn('Could not insert user data:', insertError);
+          }
+
+          return true;
+        } catch (error) {
+          console.error('Unexpected error during registration:', error);
+          return false;
+        }
       },
 
       logout: async () => {
-        await supabase.auth.signOut();
-        set({ user: null, isAuthenticated: false });
+        try {
+          await supabase.auth.signOut();
+          set({ user: null, isAuthenticated: false });
+        } catch (error) {
+          console.error('Error during logout:', error);
+          // Still clear the local state even if logout fails
+          set({ user: null, isAuthenticated: false });
+        }
       },
 
       updateProfile: async (profile: UserProfile) => {
-        const currentUser = get().user;
-        if (currentUser) {
-          const updatedUser = { ...currentUser, profile };
-          set({ user: updatedUser });
-          await supabase.auth.updateUser({ data: { profile } });
+        try {
+          const currentUser = get().user;
+          if (currentUser) {
+            const updatedUser = { ...currentUser, profile };
+            set({ user: updatedUser });
+            await supabase.auth.updateUser({ data: { profile } });
+          }
+        } catch (error) {
+          console.error('Error updating profile:', error);
         }
       },
 
@@ -277,19 +386,36 @@ export const useAuthStore = create<AuthState>()(
       },
 
       resetUserPassword: async (id: string) => {
-        const { data } = await supabase
-          .from('users')
-          .select('email')
-          .eq('id', id)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('email')
+            .eq('id', id)
+            .maybeSingle();
 
-        if (!data) {
-          throw new Error('User not found');
+          if (error) {
+            console.error('Error fetching user for password reset:', error);
+            throw new Error('User not found');
+          }
+
+          if (!data) {
+            throw new Error('User not found');
+          }
+
+          const { error: resetError } = await supabase.auth.resetPasswordForEmail(data.email, { 
+            redirectTo: REDIRECT_URL 
+          });
+          
+          if (resetError) {
+            console.error('Error sending password reset:', resetError);
+            throw resetError;
+          }
+          
+          return 'reset-link-sent';
+        } catch (error) {
+          console.error('Error in resetUserPassword:', error);
+          throw error;
         }
-
-        const { error } = await supabase.auth.resetPasswordForEmail(data.email, { redirectTo: REDIRECT_URL });
-        if (error) throw error;
-        return 'reset-link-sent';
       }
     }),
     {
@@ -304,7 +430,7 @@ supabase.auth.getSession().then(({ data: { session } }) => {
       user: {
         id: session.user.id,
         email: session.user.email || '',
-        name: session.user.user_metadata?.name,
+        name: session.user.user_metadata?.name || '',
         phone: session.user.user_metadata?.phone,
         isAdmin: false,
         createdAt: session.user.created_at,
@@ -321,7 +447,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
       user: {
         id: session.user.id,
         email: session.user.email || '',
-        name: session.user.user_metadata?.name,
+        name: session.user.user_metadata?.name || '',
         phone: session.user.user_metadata?.phone,
         isAdmin: false,
         createdAt: session.user.created_at,
